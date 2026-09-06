@@ -1,5 +1,0 @@
-{
-  "/page": "app/page.js",
-  "/manifest.webmanifest/route": "app/manifest.webmanifest/route.js",
-  "/api/media/resolve/route": "app/api/media/resolve/route.js"
-}
