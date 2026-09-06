@@ -56,7 +56,7 @@ function MainContent() {
         {status === 'processing' ? (
           <ProcessingState />
         ) : status === 'success' && media ? (
-          <MediaPreview media={media} onReset={handleReset} />
+          <MediaPreview key={media.id || media.shortcode} media={media} onReset={handleReset} />
         ) : (
           <HeroInput
             onResolveStart={handleResolveStart}

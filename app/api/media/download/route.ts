@@ -105,7 +105,9 @@ export async function GET(req: NextRequest) {
       headers.set('Content-Disposition', `attachment; filename="${cleanFilename}"`);
       headers.set('Content-Type', contentType);
       headers.set('Content-Length', String(fetched.buffer.length));
-      headers.set('Cache-Control', 'public, max-age=86400');
+      headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      headers.set('Pragma', 'no-cache');
+      headers.set('Expires', '0');
 
       return new NextResponse(new Uint8Array(fetched.buffer), {
         status: 200,
@@ -114,7 +116,9 @@ export async function GET(req: NextRequest) {
     }
 
     // Direct redirect to CDN stream if buffering failed
-    return NextResponse.redirect(mediaUrl);
+    const redirectResponse = NextResponse.redirect(mediaUrl);
+    redirectResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    return redirectResponse;
   } catch (error: any) {
     console.error('[ReelDrop] Error proxying media download:', error);
     return new NextResponse('Internal Server Error', { status: 500 });

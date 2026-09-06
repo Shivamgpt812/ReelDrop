@@ -84,6 +84,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(resolution, {
       status: 200,
       headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
         'X-RateLimit-Limit': String(rateLimit.limit),
         'X-RateLimit-Remaining': String(rateLimit.remaining),
       },
