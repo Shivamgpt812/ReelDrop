@@ -2,14 +2,19 @@ import { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'ReelDrop - Free Instagram Reel Downloader',
+    name: 'ReelDrop - Free Instagram Reel & Video Downloader in HD 1080p',
     short_name: 'ReelDrop',
-    description: 'Download Instagram Reels, Videos, and Photos in HD 1080p for free without watermarks or ads.',
+    description: 'Download Instagram Reels, Videos, Stories, and Photos in HD 1080p for free without watermarks or login.',
     start_url: '/',
+    id: '/',
+    scope: '/',
     display: 'standalone',
     background_color: '#09090b',
     theme_color: '#f43f5e',
     orientation: 'portrait-primary',
+    lang: 'en',
+    dir: 'ltr',
+    categories: ['utilities', 'multimedia', 'social', 'video'],
     icons: [
       {
         src: '/icons/icon-192x192.png',
