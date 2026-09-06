@@ -1,0 +1,32 @@
+{
+  "name": "reeldrop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Production-ready Instagram Reel and Media Downloader for Authorized Content",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "instagram-url-direct": "^2.0.7",
+    "lucide-react": "^0.453.0",
+    "next": "^14.2.15",
+    "qrcode.react": "^4.2.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "snapsave-media-downloader": "^2.4.1",
+    "tailwind-merge": "^2.5.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "typescript": "^5.6.3"
+  }
+}
