@@ -159,16 +159,51 @@ export default function InstallPwaModal() {
 
             {/* Platform Quick Guidance */}
             {isIOS ? (
-              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-900 dark:text-amber-300 space-y-2 mb-5">
-                <div className="font-bold flex items-center gap-1.5 text-amber-800 dark:text-amber-200">
-                  <Share2 className="w-4 h-4" />
-                  <span>iOS Safari Shortcut Steps:</span>
+              <div className="space-y-3 mb-5">
+                <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-900 dark:text-rose-200">
+                  <span className="font-bold flex items-center gap-1.5 mb-1">
+                    <Share2 className="w-4 h-4 text-rose-500" />
+                    How to Add to iPhone Home Screen:
+                  </span>
+                  <p className="text-[11px] text-zinc-600 dark:text-zinc-400">
+                    Apple iOS requires 2 quick taps from Safari&apos;s Share menu:
+                  </p>
                 </div>
-                <ol className="list-decimal list-inside space-y-1 pl-1 text-amber-800 dark:text-amber-400">
-                  <li>Click <strong>"Add to Home Screen"</strong> below (or tap the Safari <strong>Share</strong> icon).</li>
-                  <li>Scroll down and tap <strong>"Add to Home Screen"</strong>.</li>
-                  <li>Tap <strong>"Add"</strong> in the top-right corner.</li>
-                </ol>
+
+                <div className="space-y-2 text-xs">
+                  <div className="flex items-center gap-3 p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-800">
+                    <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-500 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      1
+                    </div>
+                    <div className="text-zinc-700 dark:text-zinc-300">
+                      Tap the <strong>Share</strong> icon <span className="inline-block px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 font-mono text-[10px]">⎋ / [↑]</span> (or click the button below)
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-800 ring-1 ring-rose-500/30">
+                    <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-500 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      2
+                    </div>
+                    <div className="text-zinc-700 dark:text-zinc-300">
+                      Scroll down in the menu & tap <strong className="text-rose-500">"Add to Home Screen" ⊞</strong>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3 p-2.5 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200/60 dark:border-zinc-800">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                      3
+                    </div>
+                    <div className="text-zinc-700 dark:text-zinc-300">
+                      Tap <strong>"Add"</strong> in the top-right corner to finish!
+                    </div>
+                  </div>
+                </div>
+
+                {isIosShared && (
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-[11px] text-emerald-700 dark:text-emerald-300 font-semibold text-center animate-pulse">
+                    👇 In the menu below, scroll down & tap &quot;Add to Home Screen&quot; ⊞
+                  </div>
+                )}
               </div>
             ) : (
               <div className="p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-700 dark:text-zinc-300 space-y-2 mb-5">
@@ -176,7 +211,7 @@ export default function InstallPwaModal() {
                   <Sparkles className="w-4 h-4 text-rose-500" />
                   <span>Android & Chrome Shortcut:</span>
                 </div>
-                <p>Click the button below to add ReelDrop directly to your home screen or desktop.</p>
+                <p>Click below to install ReelDrop directly to your home screen or app drawer with 1 tap.</p>
               </div>
             )}
 
@@ -187,7 +222,7 @@ export default function InstallPwaModal() {
                 className="w-full sm:flex-1 py-3 px-4 rounded-2xl btn-gradient font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-500/25 cursor-pointer transition-transform hover:scale-[1.02]"
               >
                 <Download className="w-4 h-4" />
-                <span>Add to Home Screen</span>
+                <span>{isIOS ? 'Open Share Menu & Add ⊞' : 'Add to Home Screen'}</span>
               </button>
 
               <button

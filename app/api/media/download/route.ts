@@ -3,6 +3,7 @@ import { isSafeMediaCdnUrl } from '@/lib/ssrf';
 import { globalRateLimiter } from '@/lib/rate-limiter';
 import { processMediaWithFfmpeg } from '@/lib/media-processor';
 import https from 'https';
+import http from 'http';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,8 @@ function isAllowedDownloadHost(urlString: string): boolean {
       hostname.includes('cdninstagram.com') ||
       hostname.includes('fbcdn.net') ||
       hostname.includes('rapidcdn.app') ||
-      hostname.includes('instagram.com')
+      hostname.includes('instagram.com') ||
+      hostname.includes('snapsave.app')
     ) {
       return true;
     }
@@ -27,27 +29,47 @@ function isAllowedDownloadHost(urlString: string): boolean {
 }
 
 /**
- * Downloads full binary chunks from upstream CDN stream
+ * Downloads full binary chunks from upstream CDN stream with redirect and host header support
  */
-async function fetchMediaStream(targetUrl: string): Promise<{ buffer: Buffer; contentType: string } | null> {
+async function fetchMediaStream(targetUrl: string, maxRedirects = 5): Promise<{ buffer: Buffer; contentType: string } | null> {
   return new Promise((resolve) => {
+    if (maxRedirects <= 0) return resolve(null);
+
     try {
       const parsed = new URL(targetUrl);
-      const req = https.get({
+      const isHttps = parsed.protocol === 'https:';
+      const client = isHttps ? https : http;
+      const host = parsed.hostname.toLowerCase();
+
+      const headers: Record<string, string> = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+      };
+
+      if (host.includes('rapidcdn.app') || host.includes('snapsave')) {
+        headers['Referer'] = 'https://snapsave.app/';
+        headers['Origin'] = 'https://snapsave.app';
+      } else if (host.includes('instagram.com') || host.includes('fbcdn.net')) {
+        headers['Referer'] = 'https://www.instagram.com/';
+      }
+
+      const req = client.get({
         hostname: parsed.hostname,
+        port: parsed.port || (isHttps ? 443 : 80),
         path: parsed.pathname + parsed.search,
         rejectUnauthorized: false,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
-          'Accept': '*/*',
-          'Accept-Language': 'en-US,en;q=0.9',
-          'Referer': 'https://www.instagram.com/',
-        }
+        headers,
       }, (res) => {
-        // Follow redirect if 301/302
+        // Handle Redirects
         if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          fetchMediaStream(res.headers.location).then(resolve);
-          return;
+          try {
+            const redirectUrl = new URL(res.headers.location, targetUrl).toString();
+            fetchMediaStream(redirectUrl, maxRedirects - 1).then(resolve);
+            return;
+          } catch {
+            return resolve(null);
+          }
         }
 
         if (res.statusCode && res.statusCode >= 200 && res.statusCode < 400) {
@@ -60,14 +82,69 @@ async function fetchMediaStream(targetUrl: string): Promise<{ buffer: Buffer; co
           });
           res.on('error', () => resolve(null));
         } else {
+          // If first try failed with 403, retry without Referer
+          if (headers['Referer']) {
+            const cleanReq = client.get({
+              hostname: parsed.hostname,
+              port: parsed.port || (isHttps ? 443 : 80),
+              path: parsed.pathname + parsed.search,
+              rejectUnauthorized: false,
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                'Accept': '*/*',
+              }
+            }, (retryRes) => {
+              if (retryRes.statusCode && retryRes.statusCode >= 200 && retryRes.statusCode < 400) {
+                const chunks: Buffer[] = [];
+                retryRes.on('data', (c) => chunks.push(Buffer.from(c)));
+                retryRes.on('end', () => {
+                  resolve({
+                    buffer: Buffer.concat(chunks),
+                    contentType: retryRes.headers['content-type'] || 'video/mp4',
+                  });
+                });
+                retryRes.on('error', () => resolve(null));
+              } else {
+                resolve(null);
+              }
+            });
+            cleanReq.on('error', () => resolve(null));
+            return;
+          }
           resolve(null);
         }
       });
+
       req.on('error', () => resolve(null));
+      req.setTimeout(60000, () => {
+        try { req.destroy(); } catch {}
+        resolve(null);
+      });
     } catch {
       resolve(null);
     }
   });
+}
+
+export async function HEAD(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const mediaUrl = searchParams.get('url');
+    if (!mediaUrl || !isAllowedDownloadHost(mediaUrl)) {
+      return new NextResponse(null, { status: 400 });
+    }
+
+    const fetched = await fetchMediaStream(mediaUrl);
+    if (fetched && fetched.buffer) {
+      const headers = new Headers();
+      headers.set('Content-Length', String(fetched.buffer.length));
+      headers.set('Content-Type', fetched.contentType);
+      return new NextResponse(null, { status: 200, headers });
+    }
+    return new NextResponse(null, { status: 200 });
+  } catch {
+    return new NextResponse(null, { status: 500 });
+  }
 }
 
 export async function GET(req: NextRequest) {
@@ -111,7 +188,7 @@ export async function GET(req: NextRequest) {
       return new NextResponse('Unauthorized or invalid media host.', { status: 403 });
     }
 
-    // Retrieve original video/media bytes directly from Instagram CDN
+    // Retrieve original video/media bytes directly from CDN
     const fetched = await fetchMediaStream(mediaUrl);
 
     if (fetched && fetched.buffer.length > 0) {
@@ -135,10 +212,14 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Direct redirect to CDN stream if buffering failed
-    const redirectResponse = NextResponse.redirect(mediaUrl);
-    redirectResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-    return redirectResponse;
+    // Direct redirect to CDN stream ONLY for 1080p if buffering failed
+    if (quality === '1080p' || quality === 'original') {
+      const redirectResponse = NextResponse.redirect(mediaUrl);
+      redirectResponse.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+      return redirectResponse;
+    }
+
+    return new NextResponse('Unable to transcode video from source stream.', { status: 502 });
   } catch (error: any) {
     console.error('[ReelDrop] Error proxying media download:', error);
     return new NextResponse('Internal Server Error', { status: 500 });

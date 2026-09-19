@@ -249,7 +249,7 @@ export default function MediaPreview({ media, onReset }: MediaPreviewProps) {
       option.type === 'audio'
         ? `Extracting ${option.label}...`
         : option.qualityParam === '1080p' || option.qualityParam === 'original'
-        ? `Starting Original Download...`
+        ? `Starting Original 1080p Download...`
         : `Compressing to ${option.label}...`
     );
 
@@ -260,20 +260,46 @@ export default function MediaPreview({ media, onReset }: MediaPreviewProps) {
       const filename = `reeldrop_${media.type}_${media.shortcode}_${option.qualityParam}.${ext}`;
       const downloadApiUrl = `/api/media/download?url=${encodeURIComponent(currentMediaUrl)}&quality=${encodeURIComponent(option.qualityParam)}&format=${encodeURIComponent(option.format)}&filename=${encodeURIComponent(filename)}`;
 
-      // Direct trigger
+      // For compressed qualities (720p, 480p, 360p) and audio, fetch the transcoded blob directly
+      if (option.qualityParam !== '1080p' && option.qualityParam !== 'original') {
+        const response = await fetch(downloadApiUrl);
+        if (!response.ok) {
+          throw new Error(`Server returned status ${response.status}`);
+        }
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 1000);
+      } else {
+        // Direct stream for 1080p Full HD original
+        const a = document.createElement('a');
+        a.href = downloadApiUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+
+      setTimeout(() => {
+        setIsProcessing(false);
+        setProcessingLabel('');
+      }, 1000);
+    } catch (err) {
+      console.error('Download error, falling back to direct stream:', err);
+      const ext = option.format;
+      const filename = `reeldrop_${media.type}_${media.shortcode}_${option.qualityParam}.${ext}`;
+      const downloadApiUrl = `/api/media/download?url=${encodeURIComponent(currentMediaUrl)}&quality=${encodeURIComponent(option.qualityParam)}&format=${encodeURIComponent(option.format)}&filename=${encodeURIComponent(filename)}`;
       const a = document.createElement('a');
       a.href = downloadApiUrl;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-
-      setTimeout(() => {
-        setIsProcessing(false);
-        setProcessingLabel('');
-      }, 2000);
-    } catch (err) {
-      console.error('Download error:', err);
       setIsProcessing(false);
       setProcessingLabel('');
     }

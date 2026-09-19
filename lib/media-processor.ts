@@ -15,10 +15,29 @@ export interface ProcessedMediaResult {
   extension: string;
 }
 
+function getFfmpegBinary(): string {
+  const commonPaths = [
+    'ffmpeg',
+    'C:\\ffmpeg\\bin\\ffmpeg.exe',
+    'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
+    '/usr/bin/ffmpeg',
+    '/usr/local/bin/ffmpeg',
+  ];
+
+  for (const p of commonPaths) {
+    try {
+      if (p === 'ffmpeg') return 'ffmpeg';
+      if (fs.existsSync(p)) return p;
+    } catch {}
+  }
+  return 'ffmpeg';
+}
+
 export async function isFfmpegAvailable(): Promise<boolean> {
   return new Promise((resolve) => {
     try {
-      const proc = spawn('ffmpeg', ['-version']);
+      const bin = getFfmpegBinary();
+      const proc = spawn(bin, ['-version']);
       proc.on('error', () => resolve(false));
       proc.on('close', (code) => resolve(code === 0));
     } catch {
@@ -90,22 +109,22 @@ export async function processMediaWithFfmpeg(
       );
     } else {
       let scaleFilter = '';
-      let crf = '23';
+      let crf = '24';
       let audioBitrate = '128k';
 
       switch (quality) {
         case '720p':
-          scaleFilter = "scale='if(gt(a,1),-2,720)':'if(gt(a,1),720,-2)'";
+          scaleFilter = "scale='if(gt(iw,ih),-2,720)':'if(gt(iw,ih),720,-2)':force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2";
           crf = '24';
           audioBitrate = '128k';
           break;
         case '480p':
-          scaleFilter = "scale='if(gt(a,1),-2,480)':'if(gt(a,1),480,-2)'";
+          scaleFilter = "scale='if(gt(iw,ih),-2,480)':'if(gt(iw,ih),480,-2)':force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2";
           crf = '26';
           audioBitrate = '96k';
           break;
         case '360p':
-          scaleFilter = "scale='if(gt(a,1),-2,360)':'if(gt(a,1),360,-2)'";
+          scaleFilter = "scale='if(gt(iw,ih),-2,360)':'if(gt(iw,ih),360,-2)':force_original_aspect_ratio=decrease,pad=ceil(iw/2)*2:ceil(ih/2)*2";
           crf = '28';
           audioBitrate = '64k';
           break;
@@ -132,8 +151,9 @@ export async function processMediaWithFfmpeg(
       );
     }
 
+    const ffmpegBin = getFfmpegBinary();
     await new Promise<void>((resolve, reject) => {
-      const proc = spawn('ffmpeg', ffmpegArgs);
+      const proc = spawn(ffmpegBin, ffmpegArgs);
       let stderrData = '';
 
       proc.stderr.on('data', (d) => {
