@@ -16,12 +16,43 @@ export interface ProcessedMediaResult {
 }
 
 function getFfmpegBinary(): string {
+  // 1. Try bundled ffmpeg-static (works in Linux serverless, Vercel, Docker, macOS, Windows)
+  try {
+    const ffmpegStatic = require('ffmpeg-static');
+    const staticPath = typeof ffmpegStatic === 'string' ? ffmpegStatic : ffmpegStatic?.default;
+    if (staticPath && fs.existsSync(staticPath)) {
+      try {
+        // Ensure execution permissions on Unix/Linux serverless
+        if (process.platform !== 'win32') {
+          fs.chmodSync(staticPath, 0o755);
+        }
+      } catch {}
+      return staticPath;
+    }
+  } catch {}
+
+  // 2. Try @ffmpeg-installer/ffmpeg
+  try {
+    const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
+    const installerPath = ffmpegInstaller?.path;
+    if (installerPath && fs.existsSync(installerPath)) {
+      try {
+        if (process.platform !== 'win32') {
+          fs.chmodSync(installerPath, 0o755);
+        }
+      } catch {}
+      return installerPath;
+    }
+  } catch {}
+
+  // 3. Fallback to system / server PATH locations
   const commonPaths = [
     'ffmpeg',
-    'C:\\ffmpeg\\bin\\ffmpeg.exe',
-    'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
     '/usr/bin/ffmpeg',
     '/usr/local/bin/ffmpeg',
+    '/opt/homebrew/bin/ffmpeg',
+    'C:\\ffmpeg\\bin\\ffmpeg.exe',
+    'C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe',
   ];
 
   for (const p of commonPaths) {

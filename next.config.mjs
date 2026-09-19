@@ -1,6 +1,9 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    serverComponentsExternalPackages: ['ffmpeg-static', '@ffmpeg-installer/ffmpeg'],
+  },
   images: {
     remotePatterns: [
       {
