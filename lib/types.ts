@@ -50,6 +50,24 @@ export interface ResolveMediaResponse {
   };
 }
 
+export type VideoQuality = '1080p' | '720p' | '480p' | '360p' | 'original';
+export type AudioQuality = 'mp3_320' | 'mp3_128' | 'm4a';
+export type MediaFormat = 'mp4' | 'mp3' | 'm4a' | 'jpg';
+
+export interface QualityOption {
+  id: string;
+  label: string;
+  sublabel: string;
+  resolution?: string;
+  bitrate?: string;
+  format: MediaFormat;
+  type: 'video' | 'audio';
+  estimatedSize?: string;
+  savings?: string;
+  recommended?: boolean;
+  qualityParam: string;
+}
+
 export interface InstagramAuthUser {
   id: string;
   username: string;
@@ -57,3 +75,4 @@ export interface InstagramAuthUser {
   mediaCount?: number;
   connectedAt: string;
 }
+

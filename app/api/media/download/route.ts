@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isSafeMediaCdnUrl } from '@/lib/ssrf';
 import { globalRateLimiter } from '@/lib/rate-limiter';
+import { processMediaWithFfmpeg } from '@/lib/media-processor';
 import https from 'https';
 
 export const dynamic = 'force-dynamic';
@@ -81,9 +82,25 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const mediaUrl = searchParams.get('url');
+    const quality = searchParams.get('quality') || '1080p';
     const format = searchParams.get('format') || 'mp4';
-    const rawFilename = searchParams.get('filename') || `reeldrop_media.${format === 'mp3' ? 'mp3' : 'mp4'}`;
-    const cleanFilename = rawFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
+    
+    // Determine default file extension
+    let defaultExt = 'mp4';
+    if (format === 'mp3' || quality.startsWith('mp3')) defaultExt = 'mp3';
+    else if (format === 'm4a' || quality === 'm4a') defaultExt = 'm4a';
+
+    const rawFilename = searchParams.get('filename') || `reeldrop_${quality}.${defaultExt}`;
+    let cleanFilename = rawFilename.replace(/[^a-zA-Z0-9._-]/g, '_');
+
+    // Ensure correct extension on filename
+    if (defaultExt === 'mp3' && !cleanFilename.endsWith('.mp3')) {
+      cleanFilename = cleanFilename.replace(/\.[a-zA-Z0-9]+$/, '') + '.mp3';
+    } else if (defaultExt === 'm4a' && !cleanFilename.endsWith('.m4a')) {
+      cleanFilename = cleanFilename.replace(/\.[a-zA-Z0-9]+$/, '') + '.m4a';
+    } else if (defaultExt === 'mp4' && !cleanFilename.endsWith('.mp4') && !cleanFilename.endsWith('.jpg')) {
+      cleanFilename = cleanFilename.replace(/\.[a-zA-Z0-9]+$/, '') + '.mp4';
+    }
 
     if (!mediaUrl) {
       return new NextResponse('Missing media URL parameter', { status: 400 });
@@ -94,22 +111,25 @@ export async function GET(req: NextRequest) {
       return new NextResponse('Unauthorized or invalid media host.', { status: 403 });
     }
 
-    // Retrieve real video/audio bytes directly from Instagram CDN
+    // Retrieve original video/media bytes directly from Instagram CDN
     const fetched = await fetchMediaStream(mediaUrl);
 
     if (fetched && fetched.buffer.length > 0) {
-      const isMp3 = format === 'mp3' || cleanFilename.endsWith('.mp3');
-      const contentType = isMp3 ? 'audio/mpeg' : fetched.contentType;
+      // Process media with FFmpeg if resolution scaling, MB reduction compression, or audio extraction requested
+      const processed = await processMediaWithFfmpeg(fetched.buffer, {
+        quality,
+        format,
+      });
 
       const headers = new Headers();
       headers.set('Content-Disposition', `attachment; filename="${cleanFilename}"`);
-      headers.set('Content-Type', contentType);
-      headers.set('Content-Length', String(fetched.buffer.length));
+      headers.set('Content-Type', processed.contentType);
+      headers.set('Content-Length', String(processed.buffer.length));
       headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
       headers.set('Pragma', 'no-cache');
       headers.set('Expires', '0');
 
-      return new NextResponse(new Uint8Array(fetched.buffer), {
+      return new NextResponse(new Uint8Array(processed.buffer), {
         status: 200,
         headers,
       });

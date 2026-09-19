@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Download, X, Share2, Smartphone, Sparkles, CheckCircle2, ArrowUpRight } from 'lucide-react';
 
 export default function InstallPwaModal() {
@@ -8,8 +9,10 @@ export default function InstallPwaModal() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     // Check if running standalone already
     const isApp = window.matchMedia('(display-mode: standalone)').matches || (window.navigator as any).standalone === true;
     setIsStandalone(isApp);
@@ -52,6 +55,41 @@ export default function InstallPwaModal() {
     }
   };
 
+  const [isIosShared, setIsIosShared] = useState(false);
+
+  const handleAddToHomeScreen = async () => {
+    if (deferredPrompt) {
+      try {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') {
+          setDeferredPrompt(null);
+          setIsModalOpen(false);
+        }
+      } catch (e) {
+        console.warn('Install prompt error:', e);
+      }
+      return;
+    }
+
+    // iOS Safari or browser fallback: trigger native Web Share API which directly reveals "Add to Home Screen" option
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: 'ReelDrop - Instagram Video Downloader',
+          text: 'Save ReelDrop to your home screen for 1-tap Instagram downloads.',
+          url: window.location.origin,
+        });
+        setIsIosShared(true);
+      } catch (err) {
+        // User cancelled share dialog or not supported
+        setIsIosShared(true);
+      }
+    } else {
+      setIsIosShared(true);
+    }
+  };
+
   if (isStandalone) {
     return null;
   }
@@ -70,14 +108,18 @@ export default function InstallPwaModal() {
       </button>
 
       {/* Instructional Modal (for iOS or non-prompt browsers) */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="relative w-full max-w-md bg-white dark:bg-zinc-900 rounded-3xl p-6 sm:p-7 shadow-2xl border border-zinc-200 dark:border-zinc-800 text-left">
+      {isModalOpen && mounted && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
+          <div 
+            className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-white dark:bg-zinc-900 rounded-3xl p-6 sm:p-7 shadow-2xl border border-zinc-200 dark:border-zinc-800 text-left my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             
             {/* Close button */}
             <button
               onClick={() => setIsModalOpen(false)}
               className="absolute top-4 right-4 p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded-full hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+              aria-label="Close modal"
             >
               <X className="w-4 h-4" />
             </button>
@@ -115,43 +157,50 @@ export default function InstallPwaModal() {
               </div>
             </div>
 
-            {/* Instructions based on OS */}
+            {/* Platform Quick Guidance */}
             {isIOS ? (
-              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-900 dark:text-amber-300 space-y-2">
-                <div className="font-bold flex items-center gap-1.5">
+              <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-900 dark:text-amber-300 space-y-2 mb-5">
+                <div className="font-bold flex items-center gap-1.5 text-amber-800 dark:text-amber-200">
                   <Share2 className="w-4 h-4" />
-                  <span>How to install on iPhone & iPad:</span>
+                  <span>iOS Safari Shortcut Steps:</span>
                 </div>
                 <ol className="list-decimal list-inside space-y-1 pl-1 text-amber-800 dark:text-amber-400">
-                  <li>Tap the <strong>Share</strong> button at the bottom of Safari.</li>
-                  <li>Scroll down and select <strong>"Add to Home Screen"</strong>.</li>
+                  <li>Click <strong>"Add to Home Screen"</strong> below (or tap the Safari <strong>Share</strong> icon).</li>
+                  <li>Scroll down and tap <strong>"Add to Home Screen"</strong>.</li>
                   <li>Tap <strong>"Add"</strong> in the top-right corner.</li>
                 </ol>
               </div>
-            ) : deferredPrompt ? (
-              <button
-                onClick={handleInstallClick}
-                className="w-full py-3 px-4 rounded-2xl btn-gradient font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-500/25 cursor-pointer"
-              >
-                <Download className="w-4 h-4" />
-                <span>Add to Home Screen Now</span>
-              </button>
             ) : (
-              <div className="p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-700 dark:text-zinc-300 space-y-2">
-                <div className="font-bold">How to install on Android / Desktop Chrome:</div>
-                <p>Tap your browser menu (<strong>⋮</strong> or <strong>Share</strong>) and click <strong>"Install ReelDrop"</strong> or <strong>"Add to Home screen"</strong>.</p>
+              <div className="p-4 rounded-2xl bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-700 dark:text-zinc-300 space-y-2 mb-5">
+                <div className="font-bold flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-rose-500" />
+                  <span>Android & Chrome Shortcut:</span>
+                </div>
+                <p>Click the button below to add ReelDrop directly to your home screen or desktop.</p>
               </div>
             )}
 
-            <button
-              onClick={() => setIsModalOpen(false)}
-              className="w-full mt-4 py-2.5 text-xs font-semibold text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200 transition-colors"
-            >
-              Close
-            </button>
+            {/* Action Buttons: Add to Home Screen + Close */}
+            <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-2">
+              <button
+                onClick={handleAddToHomeScreen}
+                className="w-full sm:flex-1 py-3 px-4 rounded-2xl btn-gradient font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-rose-500/25 cursor-pointer transition-transform hover:scale-[1.02]"
+              >
+                <Download className="w-4 h-4" />
+                <span>Add to Home Screen</span>
+              </button>
+
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="w-full sm:w-28 py-3 px-4 rounded-2xl text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-zinc-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
 
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

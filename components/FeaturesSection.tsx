@@ -13,8 +13,8 @@ import {
 const FEATURES = [
   {
     icon: Zap,
-    title: 'Lossless HD 1080p Quality',
-    description: 'Download original high-definition MP4 videos and full-resolution photos directly with maximum visual clarity.',
+    title: 'All Qualities & Less MB Compression',
+    description: 'Download in 1080p, 720p, 480p, or 360p with up to 88% MB size reduction, plus studio-quality MP3 audio.',
     color: 'text-amber-500',
     bg: 'bg-amber-500/10',
   },

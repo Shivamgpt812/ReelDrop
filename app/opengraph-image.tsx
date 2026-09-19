@@ -1,7 +1,6 @@
 import { ImageResponse } from 'next/og';
 
-export const runtime = 'edge';
-
+export const dynamic = 'force-dynamic';
 export const alt = 'ReelDrop - Free Instagram Reel & Video Downloader in HD 1080p';
 export const size = {
   width: 1200,

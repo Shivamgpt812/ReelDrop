@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import { X, Smartphone, Copy, Check, Sparkles } from 'lucide-react';
 
@@ -10,12 +11,18 @@ interface QrModalProps {
   downloadUrl: string;
   directMediaUrl?: string;
   shortcode: string;
+  qualityLabel?: string;
 }
 
-export default function QrModal({ isOpen, onClose, downloadUrl, directMediaUrl, shortcode }: QrModalProps) {
+export default function QrModal({ isOpen, onClose, downloadUrl, directMediaUrl, shortcode, qualityLabel }: QrModalProps) {
   const [copied, setCopied] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!isOpen || !mounted) return null;
 
   // On localhost, point the QR code directly to the public media stream so mobile devices can access it without network barriers.
   // In production (e.g. yourdomain.com), use the full domain download proxy.
@@ -37,10 +44,10 @@ export default function QrModal({ isOpen, onClose, downloadUrl, directMediaUrl, 
     setTimeout(() => setCopied(false), 2000);
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
       <div 
-        className="relative w-full max-w-sm bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6 sm:p-7 overflow-hidden text-center"
+        className="relative w-full max-w-sm max-h-[90vh] overflow-y-auto bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-2xl p-6 sm:p-7 text-center my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Glow decoration */}
@@ -66,7 +73,7 @@ export default function QrModal({ isOpen, onClose, downloadUrl, directMediaUrl, 
           Scan to Download on Phone
         </h3>
         <p className="text-xs text-zinc-500 dark:text-zinc-400 max-w-xs mx-auto mb-5">
-          Point your iPhone or Android camera at the QR code below to save the video directly.
+          {qualityLabel ? `Selected Quality: ${qualityLabel}. ` : ''}Point your iPhone or Android camera at the QR code below to save directly.
         </p>
 
         {/* QR Code Container */}
@@ -105,6 +112,7 @@ export default function QrModal({ isOpen, onClose, downloadUrl, directMediaUrl, 
           <span>No app required • Opens directly on phone</span>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
