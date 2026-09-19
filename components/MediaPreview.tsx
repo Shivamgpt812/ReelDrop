@@ -58,9 +58,65 @@ export default function MediaPreview({ media, onReset }: MediaPreviewProps) {
     ? media.children![activeSlideIndex].media_type === 'VIDEO'
     : isVideo;
 
-  // Define video & audio quality profiles
-  const rawSize = media.formattedSize ? media.formattedSize.replace(/\s*\([^)]*\)/g, '').trim() : '18.4 MB';
+  const [duration, setDuration] = useState<number>(media.duration || 15);
+  const [detectedBytes, setDetectedBytes] = useState<number | null>(media.fileSizeBytes || null);
 
+  // Probe exact content-length on mount if not already present
+  useEffect(() => {
+    if (media.fileSizeBytes) {
+      setDetectedBytes(media.fileSizeBytes);
+      return;
+    }
+    fetch(`/api/media/download?url=${encodeURIComponent(currentMediaUrl)}`, { method: 'HEAD' })
+      .then((res) => {
+        const cl = res.headers.get('content-length');
+        if (cl) {
+          const bytes = parseInt(cl, 10);
+          if (!isNaN(bytes) && bytes > 0) {
+            setDetectedBytes(bytes);
+          }
+        }
+      })
+      .catch(() => {});
+  }, [currentMediaUrl, media.fileSizeBytes]);
+
+  const handleVideoLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const vid = e.currentTarget;
+    if (vid.duration && !isNaN(vid.duration) && vid.duration > 0) {
+      setDuration(Math.round(vid.duration));
+    }
+  };
+
+  // Base MB calculation
+  const baseMb = useMemo(() => {
+    if (detectedBytes && detectedBytes > 0) {
+      return detectedBytes / (1024 * 1024);
+    }
+    if (media.fileSizeBytes && media.fileSizeBytes > 0) {
+      return media.fileSizeBytes / (1024 * 1024);
+    }
+    if (media.formattedSize && !isNaN(parseFloat(media.formattedSize))) {
+      const parsed = parseFloat(media.formattedSize);
+      if (parsed > 0) return parsed;
+    }
+    // Dynamic estimate based on exact video duration
+    return Math.max(1.2, (duration * 3.2) / 8);
+  }, [detectedBytes, media.fileSizeBytes, media.formattedSize, duration]);
+
+  const formatted1080p = baseMb >= 1 ? `${baseMb.toFixed(1)} MB` : `${Math.round(baseMb * 1024)} KB`;
+  const formatted720p = (baseMb * 0.46) >= 1 ? `~${(baseMb * 0.46).toFixed(1)} MB` : `~${Math.round(baseMb * 0.46 * 1024)} KB`;
+  const formatted480p = (baseMb * 0.23) >= 1 ? `~${(baseMb * 0.23).toFixed(1)} MB` : `~${Math.round(baseMb * 0.23 * 1024)} KB`;
+  const formatted360p = (baseMb * 0.12) >= 1 ? `~${(baseMb * 0.12).toFixed(1)} MB` : `~${Math.round(baseMb * 0.12 * 1024)} KB`;
+
+  const audioMb320 = (duration * 320) / (8 * 1024);
+  const audioMb128 = (duration * 128) / (8 * 1024);
+  const audioMbM4a = (duration * 128 * 0.85) / (8 * 1024);
+
+  const formattedMp3_320 = audioMb320 >= 1 ? `~${audioMb320.toFixed(1)} MB` : `~${Math.round(audioMb320 * 1024)} KB`;
+  const formattedMp3_128 = audioMb128 >= 1 ? `~${audioMb128.toFixed(1)} MB` : `~${Math.round(audioMb128 * 1024)} KB`;
+  const formattedM4a = audioMbM4a >= 1 ? `~${audioMbM4a.toFixed(1)} MB` : `~${Math.round(audioMbM4a * 1024)} KB`;
+
+  // Define video & audio quality profiles
   const videoQualityOptions: QualityOption[] = useMemo(() => [
     {
       id: '1080p',
@@ -69,7 +125,7 @@ export default function MediaPreview({ media, onReset }: MediaPreviewProps) {
       resolution: '1080x1920',
       format: 'mp4',
       type: 'video',
-      estimatedSize: rawSize,
+      estimatedSize: formatted1080p,
       savings: 'Original',
       recommended: true,
       qualityParam: '1080p',
@@ -81,7 +137,7 @@ export default function MediaPreview({ media, onReset }: MediaPreviewProps) {
       resolution: '720x1280',
       format: 'mp4',
       type: 'video',
-      estimatedSize: '~8.5 MB',
+      estimatedSize: formatted720p,
       savings: '⚡ 54% Less MB',
       qualityParam: '720p',
     },
@@ -92,7 +148,7 @@ export default function MediaPreview({ media, onReset }: MediaPreviewProps) {
       resolution: '480x854',
       format: 'mp4',
       type: 'video',
-      estimatedSize: '~4.2 MB',
+      estimatedSize: formatted480p,
       savings: '📉 77% Less MB',
       qualityParam: '480p',
     },
@@ -103,11 +159,11 @@ export default function MediaPreview({ media, onReset }: MediaPreviewProps) {
       resolution: '360x640',
       format: 'mp4',
       type: 'video',
-      estimatedSize: '~2.1 MB',
+      estimatedSize: formatted360p,
       savings: '🚀 88% Less MB',
       qualityParam: '360p',
     },
-  ], [rawSize]);
+  ], [formatted1080p, formatted720p, formatted480p, formatted360p]);
 
   const audioQualityOptions: QualityOption[] = useMemo(() => [
     {
@@ -117,7 +173,7 @@ export default function MediaPreview({ media, onReset }: MediaPreviewProps) {
       bitrate: '320 kbps',
       format: 'mp3',
       type: 'audio',
-      estimatedSize: '~2.8 MB',
+      estimatedSize: formattedMp3_320,
       savings: 'Best Sound',
       recommended: true,
       qualityParam: 'mp3_320',
@@ -129,7 +185,7 @@ export default function MediaPreview({ media, onReset }: MediaPreviewProps) {
       bitrate: '128 kbps',
       format: 'mp3',
       type: 'audio',
-      estimatedSize: '~1.2 MB',
+      estimatedSize: formattedMp3_128,
       savings: '📉 60% Less MB',
       qualityParam: 'mp3_128',
     },
@@ -140,11 +196,11 @@ export default function MediaPreview({ media, onReset }: MediaPreviewProps) {
       bitrate: '128 kbps AAC',
       format: 'm4a',
       type: 'audio',
-      estimatedSize: '~950 KB',
+      estimatedSize: formattedM4a,
       savings: '🚀 Tiny File',
       qualityParam: 'm4a',
     },
-  ], []);
+  ], [formattedMp3_320, formattedMp3_128, formattedM4a]);
 
   const imageQualityOptions: QualityOption[] = useMemo(() => [
     {
@@ -153,12 +209,12 @@ export default function MediaPreview({ media, onReset }: MediaPreviewProps) {
       sublabel: 'Full Resolution JPG',
       format: 'jpg',
       type: 'video',
-      estimatedSize: '~2.4 MB',
+      estimatedSize: formatted1080p,
       savings: 'Original',
       recommended: true,
       qualityParam: 'original',
     }
-  ], []);
+  ], [formatted1080p]);
 
   // Set default selected item
   useEffect(() => {
@@ -265,6 +321,7 @@ export default function MediaPreview({ media, onReset }: MediaPreviewProps) {
                 autoPlay
                 muted
                 loop
+                onLoadedMetadata={handleVideoLoadedMetadata}
                 className="w-full h-full object-contain"
               />
             ) : (
@@ -352,7 +409,7 @@ export default function MediaPreview({ media, onReset }: MediaPreviewProps) {
 
               <div className="text-right">
                 <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 block">
-                  {rawSize || '1080p Full HD'}
+                  {formatted1080p}
                 </span>
                 <span className="text-[10px] text-emerald-500 font-medium uppercase">
                   No Watermark

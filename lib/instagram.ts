@@ -256,6 +256,52 @@ async function fetchInstagramOEmbed(cleanUrl: string): Promise<{ title?: string;
   });
 }
 
+async function getRealMediaSize(targetUrl: string): Promise<number | null> {
+  return new Promise((resolve) => {
+    try {
+      const parsed = new URL(targetUrl);
+      const req = https.request({
+        method: 'GET',
+        hostname: parsed.hostname,
+        path: parsed.pathname + parsed.search,
+        agent: httpsAgent,
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Referer': 'https://www.instagram.com/',
+        }
+      }, (res) => {
+        if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          req.destroy();
+          getRealMediaSize(res.headers.location).then(resolve);
+          return;
+        }
+
+        const len = res.headers['content-length'];
+        if (len) {
+          const num = parseInt(len, 10);
+          if (!isNaN(num) && num > 0) {
+            req.destroy();
+            resolve(num);
+            return;
+          }
+        }
+
+        req.destroy();
+        resolve(null);
+      });
+
+      req.on('error', () => resolve(null));
+      req.setTimeout(3500, () => {
+        try { req.destroy(); } catch {}
+        resolve(null);
+      });
+      req.end();
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
 /**
  * Resolves Instagram Media:
  * 1. Extracts the exact video stream from available decoders.
@@ -308,6 +354,12 @@ export async function resolveInstagramMedia(
     };
   }
 
+  // Probe real file size from stream headers
+  const realBytes = await getRealMediaSize(directVideoUrl);
+  const formattedSize = realBytes
+    ? `${(realBytes / (1024 * 1024)).toFixed(1)} MB`
+    : '1080p Full HD';
+
   const mediaItem: MediaItem = {
     id: shortcode,
     shortcode,
@@ -321,7 +373,8 @@ export async function resolveInstagramMedia(
     duration: 15,
     isOwnerAuthorized: true,
     downloadProxyUrl: `/api/media/download?url=${encodeURIComponent(directVideoUrl)}&filename=${encodeURIComponent(filename)}`,
-    formattedSize: '18.4 MB (HD 1080p)',
+    fileSizeBytes: realBytes || undefined,
+    formattedSize,
   };
 
   return {
